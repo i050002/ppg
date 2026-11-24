@@ -387,7 +387,20 @@ function rawExport(items,filename){const rows=[['session_id','date_utc','partici
 function renderHistory(){const body=$('historyBody');body.replaceChildren();for(const x of history){const tr=document.createElement('tr');for(const value of [new Date(x.date).toLocaleString(),x.name,x.age,x.condition,x.bpm==null?'—':x.bpm.toFixed(1),x.duration.toFixed(1)+' s']){const td=document.createElement('td');td.textContent=value;tr.append(td)}const td=document.createElement('td'),b=document.createElement('button');b.className='button';b.textContent='CSV';b.onclick=()=>rawExport([x],'ppg_'+x.id+'.csv');td.append(b);tr.append(td);body.append(tr)}if(!history.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=7;td.textContent='No saved measurements yet.';tr.append(td);body.append(tr)}$('clearHistory').disabled = !history.length}
 let db=null,user=null;
 async function loadHistory(){if(!user)return;const owner=user.id;const {data,error}=await db.from('ppg_measurements').select('measurement').eq('user_id',owner).order('created_at',{ascending:false});if(user?.id!==owner)return;if(error){$('saveStatus').textContent=error.message;return}history=data.map(r=>r.measurement);renderHistory()}
-$('exportAll').onclick=()=>exportCSV([metaHeader,...history.map(meta)],'ppg_summary.csv');$('exportRaw').onclick=()=>rawExport(history,'ppg_all.csv');$('clearHistory').onclick=async()=>{if(!user||!confirm('Delete all your measurements from the database?'))return;const {error}=await db.from('ppg_measurements').delete().eq('user_id',user.id);if(error)$('saveStatus').textContent=error.message;else await loadHistory()};
+$('clearHistory').onclick = async () => {
+    if (!user || !confirm('Delete all your measurements from the database?')) return;
+
+    const { error } = await db
+        .from('ppg_measurements')
+        .delete()
+        .eq('user_id', user.id);
+
+    if (error) {
+        $('saveStatus').textContent = error.message;
+    } else {
+        await loadHistory();
+    }
+};
 async function initAuth(){const msg=$('authStatus');try{db=supabase.createClient(PPG_CONFIG.url,PPG_CONFIG.anonKey);const apply=async session=>{user=session?.user||null;$('app').hidden=!user;$('loginForm').hidden=!!user;$('logout').hidden=!user;msg.textContent=user?'Signed in as '+user.email:'Sign in to access your measurements.';history=[];renderHistory();if(user)await loadHistory();else if(stream){cancelAnimationFrame(raf);stream.getTracks().forEach(t=>t.stop());stream=null;track=null;el.video.srcObject=null;el.start.disabled=false;el.stop.disabled=true;lockFields(false)}};const {data}=await db.auth.getSession();await apply(data.session);db.auth.onAuthStateChange((event,session)=>{if(event!=='TOKEN_REFRESHED')setTimeout(()=>apply(session),0)});$('loginForm').onsubmit=async e=>{e.preventDefault();const {error}=await db.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(error)msg.textContent=error.message;else $('password').value=''};$('register').onclick=async()=>{if(!$('loginForm').reportValidity())return;const {data,error}=await db.auth.signUp({email:$('email').value,password:$('password').value});msg.textContent=error?error.message:data.session?'Account created.':'Check your email to confirm your account.'};$('logout').onclick=async()=>{if(stream){msg.textContent='Stop and save the measurement before signing out.';return}const {error}=await db.auth.signOut();if(error)msg.textContent=error.message}}catch(e){msg.textContent='Configure Supabase in config.js: '+e.message}}
 initAuth();renderHistory();
 el.start.addEventListener('click',start);el.stop.addEventListener('click',stop);el.torch.addEventListener('click',()=>enableTorch(!torchOn));window.addEventListener('pagehide',()=>{stream?.getTracks().forEach(t=>t.stop())});drawPlot();
