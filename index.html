@@ -361,7 +361,7 @@ if(valid){
  invalidTimes.push(t);el.quality.textContent='Poor';el.qualityBar.style.width='0%';
  const holding=lastValid&&t-lastValid.t<=HOLD_SECONDS;
  el.bpm.textContent=holding?Math.round(lastValid.bpm):'--';el.bpm.style.opacity=holding?'.55':'1';
- el.desc.textContent=holding?'';
+ el.desc.textContent = '';
  setStatus(!covered?'Cover the camera and flashlight gently.':clipping?'':'Signal unstable. Keep your finger and phone still.');
 }}
 
