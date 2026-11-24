@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+  <meta content="#0b1220" name="theme-color"/>
+  <title>
+   Finger PPG Lab — Camera + Flashlight
+  </title>
+  <style>
+   :root{color-scheme:dark;--bg:#0b1220;--panel:#111e30;--border:#26364c;--muted:#a3b4c8;--bright:#f5f9ff;--accent:#4ce0b3;--red:#fb7185}
+*[hidden]{display:none!important} *{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#172b40,#0b1220 65%);color:var(--bright);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:1040px;margin:auto;padding:24px 16px 52px}
+.eyebrow{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);font-weight:800}
+h1{margin:9px 0;font-size:clamp(28px,5vw,43px);letter-spacing:-.035em}
+.lead{line-height:1.6;color:var(--muted);max-width:750px;margin:0 0 24px}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+.card{padding:20px;border:1px solid var(--border);background:linear-gradient(160deg,#17283c,#111b2b);border-radius:20px;box-shadow:0 12px 35px #0002}
+.card h2{font-size:16px;margin:0 0 15px}
+.preview{position:relative;background:#050b12;border:1px solid #354358;overflow:hidden;border-radius:15px;aspect-ratio:16/9;display:grid;place-items:center}
+.preview video{width:100%;height:100%;object-fit:cover;filter:blur(1px)}
+.preview .overlay{position:absolute;bottom:10px;left:10px;background:#0009;border:1px solid #ffffff20;border-radius:10px;padding:7px 10px;font-size:12px}
+.preview .empty{color:var(--muted);text-align:center;padding:18px}
+.buttons{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}
+.button{border:1px solid #375064;color:#f9fcff;background:#23364d;border-radius:11px;padding:11px 14px;font:inherit;font-weight:700;cursor:pointer}
+.button.primary{color:#05251c;background:var(--accent);border-color:var(--accent)}
+.button:disabled{opacity:.38;cursor:not-allowed}
+.button.danger{background:#372234;border-color:#63354a}
+.status{font-size:13px;color:var(--muted);min-height:37px;line-height:1.5}
+.status strong{color:var(--accent)}
+.bpm{font-size:clamp(56px,9vw,94px);font-variant-numeric:tabular-nums;font-weight:800;line-height:1;letter-spacing:-.055em}
+.bpm small{font-size:19px;color:var(--muted);font-weight:500;letter-spacing:0}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0}
+.metric{padding:13px;border:1px solid var(--border);border-radius:13px;background:#0b1728}
+.metric .k{font-size:12px;color:var(--muted)}
+.metric .v{font-size:21px;font-weight:750;margin-top:5px;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:10px;background:#314155;overflow:hidden;margin-top:9px}
+.bar span{display:block;background:var(--accent);height:100%;width:0;transition:width .4s}
+.tip{color:#b5c4d5;font-size:13px;line-height:1.65}
+.wide{grid-column:1/-1}
+canvas#plot{width:100%;height:220px;background:#081422;border-radius:14px;border:1px solid var(--border)}
+.legend{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:9px 0 0}
+.dot{display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:50%;margin-right:5px}
+select{background:#172638;color:white;border:1px solid #456078;border-radius:8px;padding:6px}
+footer{margin-top:20px;color:var(--muted);font-size:12px;line-height:1.6}
+code{font-size:12px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}
+.card{padding:16px}
+}
+
+input{width:100%;background:#0b1728;color:white;border:1px solid #456078;border-radius:8px;padding:10px;font:inherit}
+label{display:block;color:var(--muted);font-size:13px;margin-bottom:5px}
+.fields{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.fields select{width:100%;padding:10px}
+.history{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+ @media(max-width:600px){.fields{grid-template-columns:1fr}
+}
+  </style>
+ </head>
+ <body>
+  <main class="wrap">
+   <h1>
+    Finger PPG Lab
+    <span style="color:var(--accent)">
+     ♥
+    </span>
+   </h1>
+   <p class="lead">
+    Estimate heart rate from fingertip color intensity changes.
+   </p>
+   <section class="card" id="authCard"><h2>Account login</h2><form id="loginForm"><div class="fields"><div><label>Email</label><input id="email" type="email" required autocomplete="email"></div><div><label>Password</label><input id="password" type="password" required autocomplete="current-password"></div></div><div class="buttons"><button class="button primary" type="submit">Sign in</button><button class="button" type="button" id="register">Create account</button></div></form><div id="authStatus" class="tip" role="status"></div><button class="button" id="logout" hidden>Sign out</button></section><div class="grid" id="app" hidden style="margin-top:16px">
+    <section class="card wide">
+     <h2>
+      Participant information
+     </h2>
+     <div class="fields">
+      <div>
+       <label for="name">
+        Full name or participant ID
+       </label>
+       <input autocomplete="off" id="name" maxlength="100" placeholder="Enter name or ID" required=""/>
+      </div>
+      <div>
+       <label for="age">
+        Age (years)
+       </label>
+       <input id="age" max="120" min="1" placeholder="Age" required="" step="1" type="number"/>
+      </div>
+      <div>
+       <label for="condition">
+        Measurement condition
+       </label>
+       <select id="condition">
+        <option>
+         Baseline
+        </option>
+        <option>
+         Post-activity
+        </option>
+        <option>
+         Recovery
+        </option>
+        <option>
+         Other
+        </option>
+       </select>
+      </div>
+     </div>
+    </section>
+    <section class="card">
+     <h2>
+      01 · Camera &amp; data acquisition
+     </h2>
+     <div class="preview">
+      <video autoplay="" id="video" muted="" playsinline="">
+      </video>
+      <div class="empty" id="empty">
+       Enable the camera to begin recording.
+      </div>
+      <div class="overlay" hidden="" id="camOverlay">
+       Rear camera · Live
+      </div>
+     </div>
+     <div class="buttons">
+      <button class="button primary" id="start">
+       ▶ Start measurement
+      </button>
+      <button class="button danger" disabled="" id="stop">
+       ■ Stop &amp; save
+      </button>
+      <button class="button" disabled="" id="torch">
+       🔦 Flashlight: —
+      </button>
+     </div>
+     <p class="status" id="status">
+      Ready. Use HTTPS or localhost to allow camera access.
+     </p>
+     <div class="tip">
+      <b>
+       Finger placement:
+      </b>
+      Gently cover the rear camera lens and flashlight with your fingertip.
+     </div>
+    </section>
+    <section class="card">
+     <h2>
+      02 · Heart rate estimation
+     </h2>
+     <div class="bpm">
+      <span id="bpm">
+       --
+      </span>
+      <small>
+       BPM
+      </small>
+     </div>
+     <p class="tip" id="bpmDesc">
+      First estimate after approximately 4–6 seconds of clean signal.
+     </p>
+     <div class="metrics">
+      <div class="metric">
+       <div class="k">
+        Recording duration
+       </div>
+       <div class="v" id="elapsed">
+        0.0 s
+       </div>
+      </div>
+      <div class="metric">
+       <div class="k">
+        Recorded camera samples
+       </div>
+       <div class="v" id="samples">
+        0
+       </div>
+      </div>
+      <div class="metric">
+       <div class="k">
+        Signal quality
+       </div>
+       <div class="v" id="quality">
+        —
+       </div>
+       <div class="bar">
+        <span id="qualityBar">
+        </span>
+       </div>
+      </div>
+      <div class="metric">
+       <div class="k">
+        Flashlight status
+       </div>
+       <div class="v" id="flashState">
+        —
+       </div>
+      </div>
+     </div>
+    </section>
+    <section class="card wide">
+     <h2>
+      03 · PPG waveform (processed)
+     </h2>
+     <canvas aria-label="PPG signal plot" height="300" id="plot" width="1000">
+     </canvas>
+     <div class="legend">
+      <span>
+       <i class="dot">
+       </i>
+       Filtered PPG signal
+      </span>
+      <span>
+       Channel:
+       <select id="channel">
+        <option value="auto">
+         Automatic (R/G)
+        </option>
+        <option value="red">
+         Red (R)
+        </option>
+        <option value="green">
+         Green (G)
+        </option>
+       </select>
+      </span>
+     </div>
+    </section>
+    <section class="card wide">
+     <h2>
+      04 · Saved measurement history
+     </h2>
+     <div class="buttons">
+      <button class="button primary" id="exportAll">
+       Export all summaries (CSV)
+      </button>
+      <button class="button" id="exportRaw">
+       Export all BPM (CSV)
+      </button>
+      <button class="button danger" id="clearHistory">
+       Clear history
+      </button>
+     </div>
+     <p class="tip">
+      BPM is calculated using a trailing 3-second moving average and exported every second. Missing estimates are left blank.
+     </p>
+     <p class="tip" id="saveStatus" role="status">
+     </p>
+     <div class="history">
+      <table>
+       <thead>
+        <tr>
+         <th>
+          Date / time
+         </th>
+         <th>
+          Participant
+         </th>
+         <th>
+          Age
+         </th>
+         <th>
+          Condition
+         </th>
+         <th>
+          Mean BPM
+         </th>
+         <th>
+          Duration
+         </th>
+         <th>
+          Action
+         </th>
+        </tr>
+       </thead>
+       <tbody id="historyBody">
+       </tbody>
+      </table>
+     </div>
+    </section>
+   </div>
+   <footer>
+    Educational tool,
+    <b>
+     not a medical device
+    </b>
+   </footer>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+'use strict';
+const $ = id=>document.getElementById(id);
+const el={video:$('video'),empty:$('empty'),overlay:$('camOverlay'),start:$('start'),stop:$('stop'),torch:$('torch'),status:$('status'),bpm:$('bpm'),desc:$('bpmDesc'),elapsed:$('elapsed'),samples:$('samples'),quality:$('quality'),qualityBar:$('qualityBar'),flash:$('flashState'),channel:$('channel'),plot:$('plot')};
+let lastVideoTime=-1;let stream=null,track=null,torchOn=false,hasTorch=false,startedAt=0,lastSampleAt=0,lastAnalyzeAt=0,lastDrawAt=0,raf=0,records=[],liveEstimate=null;
+const capture=document.createElement('canvas');capture.width=64;capture.height=64;const cctx=capture.getContext('2d',{willReadFrequently:true});
+const g=el.plot.getContext('2d');
+function setStatus(msg){el.status.textContent=msg}
+function mean(x){return x.reduce((a,b)=>a+b,0)/(x.length||1)}
+function variance(x){const m=mean(x);return mean(x.map(v=>(v-m)**2))}
+function std(x){return Math.sqrt(variance(x))}
+// Resample uneven camera timestamps onto a fixed sampling grid.
+function resample(recs,kind,fs=30){if(recs.length<2)return[];const t0=recs[0].t,t1=recs[recs.length-1].t,n=Math.floor((t1-t0)*fs);const out=[];let i=0;for(let k=0;k<=n;k++){const t=t0+k/fs;while(i<recs.length-2&&recs[i+1].t<t)i++;const a=recs[i],b=recs[i+1],d=(b.t-a.t)||1,w=Math.max(0,Math.min(1,(t-a.t)/d));out.push((a[kind]*(1-w)+b[kind]*w))}return out}
+// Cascaded second-order Butterworth high-pass and low-pass (0.7–3.5 Hz).
+function biquad(x,fs,fc,high){const w=2*Math.PI*fc/fs,c=Math.cos(w),alpha=Math.sin(w)/Math.sqrt(2),a0=1+alpha;const b0=(high?(1+c):(1-c))/2/a0,b1=(high?-(1+c):(1-c))/a0,b2=b0,a1=-2*c/a0,a2=(1-alpha)/a0;let x1=x[0],x2=x[0],y1=high?0:x[0],y2=y1;return x.map(v=>{const y=b0*v+b1*x1+b2*x2-a1*y1-a2*y2;x2=x1;x1=v;y2=y1;y1=y;return y})}
+function filterSignal(series,fs=30){if(series.length<15)return[];const x=series.map((v,i)=>{const a=series.slice(Math.max(0,i-1),i+2).sort((a,b)=>a-b);return a[Math.floor(a.length/2)]});return biquad(biquad(x,fs,.7,true),fs,3.5,false)}
+function correlate(y,fs=30){if(y.length<fs*3.5)return null;const x=y.slice(-fs*7),mu=mean(x),sd=std(x);if(sd<.035)return null;const z=x.map(v=>v-mu);const lo=Math.floor(fs*60/180),hi=Math.ceil(fs*60/45),scores=[];for(let lag=lo-1;lag<=hi+1;lag++){let a=0,b=0,c=0;for(let i=lag;i<z.length;i++){a+=z[i]*z[i-lag];b+=z[i]*z[i];c+=z[i-lag]*z[i-lag]}scores[lag]=a/(Math.sqrt(b*c)||1)}const peaks=[];for(let l=lo;l<=hi;l++)if(scores[l]>=scores[l-1]&&scores[l]>=scores[l+1])peaks.push(l);if(!peaks.length)return null;const max=Math.max(...peaks.map(l=>scores[l]));const lag=peaks.find(l=>scores[l]>=Math.max(.55,max-.08));if(!lag)return null;const a=scores[lag-1],b=scores[lag],c=scores[lag+1],d=a-2*b+c;const refined=lag+(d?Math.max(-.5,Math.min(.5,.5*(a-c)/d)):0);return {bpm:60*fs/refined,corr:b,sd}}
+function analyze(){const recent=records.filter(r=>r.t>=records.at(-1).t-8);if(recent.length<45||recent.at(-1).t-recent[0].t<4)return null;const dt=recent.at(-1).t-recent[0].t;if((recent.length-1)/dt<12||recent.some((r,i)=>i&&r.t-recent[i-1].t>.3))return null;const candidates=(el.channel.value==='auto'?['r','g']:[el.channel.value==='red'?'r':'g']).map(kind=>{const raw=resample(recent,kind);if(mean(raw)<10||mean(raw)>252)return null;const flt=filterSignal(raw).slice(15);const est=correlate(flt);return est?{...est,kind,signal:flt}:null}).filter(Boolean).sort((a,b)=>b.corr-a.corr);return candidates[0]||null}
+function drawPlot(){const w=el.plot.width,h=el.plot.height;g.clearRect(0,0,w,h);g.fillStyle='#081422';g.fillRect(0,0,w,h);g.strokeStyle='#25374b';g.lineWidth=1;for(let i=1;i<6;i++){let y=i*h/6;g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke()}for(let i=1;i<8;i++){let x=i*w/8;g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke()}
+let rec=records.length?records.filter(r=>r.t>=records[records.length-1].t-15):[];let raw=resample(rec,liveEstimate?.kind||'r'),y=filterSignal(raw);if(y.length<2){g.fillStyle='#72869e';g.font='20px system-ui';g.textAlign='center';g.fillText('The waveform will appear after finger placement',w/2,h/2);return}let lo=Math.min(...y),hi=Math.max(...y),scale=Math.max(hi-lo,.0001);g.strokeStyle='#4ce0b3';g.lineWidth=2.6;g.lineJoin='round';g.beginPath();for(let i=0;i<y.length;i++){let xx=i/(Math.max(y.length-1,1))*w,yy=h*.86-(y[i]-lo)/scale*h*.72;if(!i)g.moveTo(xx,yy);else g.lineTo(xx,yy)}g.stroke()}
+function sampleFrame(now){if(!stream||el.stop.disabled)return;raf=requestAnimationFrame(sampleFrame);if(now-lastSampleAt<25)return;lastSampleAt=now;if(el.video.readyState<2||el.video.currentTime===lastVideoTime)return;lastVideoTime=el.video.currentTime;try{cctx.drawImage(el.video,0,0,64,64);const data=cctx.getImageData(0,0,64,64).data;let r=0,g=0,b=0,n=0;for(let y=12;y<52;y+=2)for(let x=12;x<52;x+=2){let i=(y*64+x)*4;r+=data[i];g+=data[i+1];b+=data[i+2];n++}r/=n;g/=n;b/=n;const t=(performance.now()-startedAt)/1000;records.push({t,r,g,b});el.elapsed.textContent=t.toFixed(1)+' s';el.samples.textContent=records.length.toLocaleString('en-US');
+if(now-lastAnalyzeAt>=500){lastAnalyzeAt=now;const recent=records.filter(v=>v.t>t-3);const avgR=mean(recent.map(v=>v.r)),avgG=mean(recent.map(v=>v.g));const covered=avgR>38&&avgR>avgG*1.13;const clipping=avgR>253;
+if(!covered){liveEstimate=null;el.bpm.textContent='--';el.desc.textContent='Cover the camera and flashlight with your fingertip and remain still.';setStatus('Finger not detected reliably (low red color indicator).')}else if(clipping){liveEstimate=null;el.bpm.textContent="--";el.desc.textContent='Image is saturated. Reduce pressure or reposition your finger.';setStatus('Warning: signal may be saturated due to excessive light.')}else{liveEstimate=analyze();if(!liveEstimate){el.bpm.textContent='--';el.desc.textContent='Collecting signal. Allow approximately 4–6 seconds of clean signal.';setStatus('Finger detected. Keep your finger still.')}else{let q=Math.max(0,Math.min(100,Math.round((liveEstimate.corr-.2)/.65*100)));el.quality.textContent=q>=75?'Good':q>=45?'Fair':'Poor';el.qualityBar.style.width=q+'%';if(q>=55 && liveEstimate.bpm>=45 && liveEstimate.bpm<=180 && acceptBPM(t,liveEstimate.bpm)){estimates.push({t,bpm:liveEstimate.bpm,quality:q,channel:liveEstimate.kind});const smoothed=movingAverageAt(t,estimates);el.bpm.textContent=smoothed.bpm==null?'--':Math.round(smoothed.bpm);el.desc.textContent='3-second moving average, updated every 0.5 seconds.';setStatus('Periodic signal detected. Keep your finger and phone still.')}else{el.bpm.textContent='--';el.desc.textContent='Signal is too unstable to display BPM.';setStatus('Low signal quality. Reduce motion and adjust finger placement.')}}}if(!liveEstimate){el.quality.textContent='—';el.qualityBar.style.width='0%'}}
+if(now-lastDrawAt>85){lastDrawAt=now;drawPlot()}if(t>=120){void stop();return;}
+}catch(e){setStatus('Unable to read camera frame: '+e.message)}}
+async function enableTorch(on){if(!track)return false;try{await track.applyConstraints({advanced:[{torch:on}]});torchOn=on;el.torch.textContent='🔦 Flashlight: '+(on?'ON':'OFF');el.flash.textContent=on?'ON':'OFF';return true}catch(e){torchOn=false;el.flash.textContent='Unsupported';el.torch.textContent='🔦 Unsupported';el.torch.disabled=true;return false}}
+async function start(){if(stream)return;if(!user||!prepareSession())return;if(!navigator.mediaDevices?.getUserMedia){setStatus('Camera access requires HTTPS or localhost. Open the HTTPS site rather than a local file.');return}lockFields(true);el.start.disabled=true;setStatus('Requesting rear camera permission…');try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:640},height:{ideal:480},frameRate:{ideal:30}}});track=stream.getVideoTracks()[0];el.video.srcObject=stream;await el.video.play();el.empty.hidden=true;el.overlay.hidden=false;const caps=track.getCapabilities?.()||{};hasTorch=!!caps.torch;el.torch.disabled=!hasTorch;el.flash.textContent=hasTorch?'Available':'Unsupported';el.torch.textContent=hasTorch?'🔦 Flashlight: OFF':'🔦 Unsupported';if(hasTorch)await enableTorch(true);records=[];lastVideoTime=-1;liveEstimate=null;el.bpm.textContent='--';startedAt=performance.now();lastSampleAt=0;lastAnalyzeAt=0;lastDrawAt=0;el.stop.disabled=false;setStatus(hasTorch&&torchOn?'Camera and flashlight are active. Cover both with your fingertip.':'Camera active. Browser flashlight control is unavailable; measurement may fail without illumination.');raf=requestAnimationFrame(sampleFrame)}catch(e){setStatus('Unable to open camera: '+e.message+'. Check camera permissions, close other camera apps, and use HTTPS.');stream?.getTracks().forEach(t=>t.stop());stream=null;track=null;el.start.disabled=false;lockFields(false)}}
+async function stop(){if(!stream||el.stop.disabled)return;el.stop.disabled=true;cancelAnimationFrame(raf);if(track&&torchOn){try{await enableTorch(false)}catch(e){}}stream?.getTracks().forEach(t=>t.stop());stream=null;track=null;el.video.srcObject=null;el.empty.hidden=false;el.overlay.hidden=true;el.stop.disabled=true;el.start.disabled=false;el.torch.disabled=true;el.flash.textContent='OFF';setStatus('Measurement complete.');lockFields(false);drawPlot();await saveSession()}
+const key='finger_ppg_moving_average_v2';let session=null,estimates=[],history=[];
+function lockFields(v){for(const id of ['name','age','condition'])$(id).disabled=v}
+function prepareSession(){const name=$('name').value.trim(),age=Number($('age').value);if(!name||!Number.isInteger(age)||age<1||age>120){setStatus('Enter a participant name or ID and a valid age (1–120).');return false}session={id:globalThis.crypto?.randomUUID?.()||Date.now().toString(),name,age,condition:$('condition').value,date:new Date().toISOString()};estimates=[];return true}
+function acceptBPM(t,bpm){const recent=estimates.filter(e=>e.t>t-3).map(e=>e.bpm).sort((a,b)=>a-b);return !recent.length||Math.abs(bpm-recent[Math.floor(recent.length/2)])<=Math.max(15,recent[Math.floor(recent.length/2)]*.2)}
+function movingAverageAt(t,values){const valid=values.filter(e=>e.t>t-3&&e.t<=t);const enough=valid.length>=1&&t-valid.at(-1).t<=1;return {start:Math.max(0,t-3),end:t,bpm:enough?mean(valid.map(e=>e.bpm)):null,quality:enough?mean(valid.map(e=>e.quality)):null,count:valid.length};}
+function summarize5(duration,values){const result=[];for(let t=1;t<=duration;t++)result.push(movingAverageAt(t,values));return result;}
+function currentSession(){const duration=records.at(-1)?.t||0;return {...session,duration,count:records.length,bpm:estimates.length?mean(estimates.map(x=>x.bpm)):null,quality:estimates.length?mean(estimates.map(x=>x.quality)):null,validCount:estimates.length,windows:summarize5(duration,estimates)}}
+function compact(x){if(Array.isArray(x.windows))return x;const {records:raw,estimates:old,...rest}=x;return {...rest,validCount:old?.length||0,windows:summarize5(x.duration,old||[])}}
+async function saveSession(){if(!session||!records.length||!user)return;const item=currentSession();$('saveStatus').textContent='Saving to database…';const {error}=await db.from('ppg_measurements').upsert({id:item.id,user_id:user.id,measurement:item});if(error){$('saveStatus').textContent='Database save failed: '+error.message;rawExport([item],'unsaved_'+item.id+'.csv');return}await loadHistory();$('saveStatus').textContent='Measurement saved to database.'}
+function csvCell(v){if(v==null)return '';let str=String(v);if(typeof v==='string'&&/^[=+@\-\t\r]/.test(str))str="'"+str;return '"'+str.replaceAll('"','""')+'"'}
+function exportCSV(rows,filename){const blob=new Blob([rows.map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+const metaHeader=['session_id','date_utc','participant','age','condition','duration_s','mean_bpm'];
+function meta(x){return [x.id,x.date,x.name,x.age,x.condition,x.duration.toFixed(3),x.bpm?.toFixed(2)]}
+function rawExport(items,filename){const rows=[['session_id','date_utc','participant','age','condition','time_s','bpm']];for(const item of items){const x=compact(item);for(const w of x.windows)rows.push([x.id,x.date,x.name,x.age,x.condition,w.end.toFixed(2),w.bpm?.toFixed(2)])}exportCSV(rows,filename)}
+function renderHistory(){const body=$('historyBody');body.replaceChildren();for(const x of history){const tr=document.createElement('tr');for(const value of [new Date(x.date).toLocaleString(),x.name,x.age,x.condition,x.bpm==null?'—':x.bpm.toFixed(1),x.duration.toFixed(1)+' s']){const td=document.createElement('td');td.textContent=value;tr.append(td)}const td=document.createElement('td'),b=document.createElement('button');b.className='button';b.textContent='CSV';b.onclick=()=>rawExport([x],'ppg_'+x.id+'.csv');td.append(b);tr.append(td);body.append(tr)}if(!history.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=7;td.textContent='No saved measurements yet.';tr.append(td);body.append(tr)}$('exportAll').disabled=$('exportRaw').disabled=$('clearHistory').disabled=!history.length}
+let db=null,user=null;
+async function loadHistory(){if(!user)return;const owner=user.id;const {data,error}=await db.from('ppg_measurements').select('measurement').eq('user_id',owner).order('created_at',{ascending:false});if(user?.id!==owner)return;if(error){$('saveStatus').textContent=error.message;return}history=data.map(r=>r.measurement);renderHistory()}
+$('exportAll').onclick=()=>exportCSV([metaHeader,...history.map(meta)],'ppg_summary.csv');$('exportRaw').onclick=()=>rawExport(history,'ppg_all.csv');$('clearHistory').onclick=async()=>{if(!user||!confirm('Delete all your measurements from the database?'))return;const {error}=await db.from('ppg_measurements').delete().eq('user_id',user.id);if(error)$('saveStatus').textContent=error.message;else await loadHistory()};
+async function initAuth(){const msg=$('authStatus');try{db=supabase.createClient(PPG_CONFIG.url,PPG_CONFIG.anonKey);const apply=async session=>{user=session?.user||null;$('app').hidden=!user;$('loginForm').hidden=!!user;$('logout').hidden=!user;msg.textContent=user?'Signed in as '+user.email:'Sign in to access your measurements.';history=[];renderHistory();if(user)await loadHistory();else if(stream){cancelAnimationFrame(raf);stream.getTracks().forEach(t=>t.stop());stream=null;track=null;el.video.srcObject=null;el.start.disabled=false;el.stop.disabled=true;lockFields(false)}};const {data}=await db.auth.getSession();await apply(data.session);db.auth.onAuthStateChange((event,session)=>{if(event!=='TOKEN_REFRESHED')setTimeout(()=>apply(session),0)});$('loginForm').onsubmit=async e=>{e.preventDefault();const {error}=await db.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(error)msg.textContent=error.message;else $('password').value=''};$('register').onclick=async()=>{if(!$('loginForm').reportValidity())return;const {data,error}=await db.auth.signUp({email:$('email').value,password:$('password').value});msg.textContent=error?error.message:data.session?'Account created.':'Check your email to confirm your account.'};$('logout').onclick=async()=>{if(stream){msg.textContent='Stop and save the measurement before signing out.';return}const {error}=await db.auth.signOut();if(error)msg.textContent=error.message}}catch(e){msg.textContent='Configure Supabase in config.js: '+e.message}}
+initAuth();renderHistory();
+el.start.addEventListener('click',start);el.stop.addEventListener('click',stop);el.torch.addEventListener('click',()=>enableTorch(!torchOn));el.channel.addEventListener('change',()=>{liveEstimate=null});window.addEventListener('pagehide',()=>{stream?.getTracks().forEach(t=>t.stop())});drawPlot();
+  </script>
+ </body>
+</html>
