@@ -1,1 +1,1 @@
-const PPG_CONFIG = {url: 'https://YOUR_PROJECT.supabase.co', anonKey: 'YOUR_PUBLISHABLE_OR_ANON_KEY'};
+const PPG_CONFIG = {url: 'https://ipnhubtendfjetnblzto.supabase.co', anonKey: 'sb_publishable_ZftZLbgUhFZgW8wO1rIXRA_jIz_kGNa'};
